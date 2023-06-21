@@ -6,6 +6,7 @@
 #include <string>
 #include <fstream>
 
+#include <Windows.h>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
@@ -25,6 +26,7 @@ std::string cmd_exec(const char* cmd)
 	
 	try
 	{
+		//compiler gives a warning because of the memory unsafety of strlen()
 		while (fgets(buffer, strlen(buffer), pipe) != NULL)
 			res += buffer;
 	}

