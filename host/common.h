@@ -7,6 +7,7 @@
 #include <vector>
 #include <fstream>
 #include <tchar.h>
+#include <string>
 
 #include <Windows.h>
 #include <atomic>

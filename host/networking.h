@@ -4,6 +4,7 @@
 constexpr uint16 DEFAULT_PORT = 9001;
 constexpr uint16 MAX_PACKET_SIZE = 1024;
 constexpr uint16 BACKLOG = 512;
+constexpr uint16 CHUNCK_SIZE = 1024;
 
 WSADATA _wsa;
 
@@ -16,6 +17,12 @@ DWORD WINAPI net_subroutine(LPVOID clients);
 struct user {
 	SOCKET fd;
 	char username[256];
+};
+
+struct data_chunck
+{
+	char content[CHUNCK_SIZE];
+	unsigned long iteration;
 };
 
 class networking
@@ -35,17 +42,81 @@ public:
 		//i can't even use a goddamn vector properly without casting it
 		 T = CreateThread(
 			NULL,
-			0,
+			0, //default stack size allocated for thread
 			net_subroutine,
 			&client,
 			0,
 			NULL );
-		
+
 		 if (T == NULL)
 			 throw std::runtime_error("Error creating thread");
 	}
 
-	~networking()
+	int send_text(SOCKET fd, std::string buffer) // default return value = 0
+	{
+		int bytes_recv = send(fd, buffer.c_str(), buffer.size(), 0);
+		if (bytes_recv == SOCKET_ERROR)
+		{
+			return -1;
+		}
+		
+		return 0;
+	}
+	
+	int recv_text(SOCKET fd, std::string &buffer) // default return value = 0
+	{
+		char buf[MAX_PACKET_SIZE]{ 0 };
+		int res = recv(fd, buf, sizeof(buf), 0);
+		switch (res)
+		{
+		case SOCKET_ERROR:
+			return -1;
+		
+		case 0:
+			return 0;
+
+		default:
+			buffer = buf;
+			return 0;
+		}
+	}
+
+	std::string recv_all_f(SOCKET Dst)
+	{
+		std::string res;
+		struct data_chunck buffer;
+
+		while (true)
+		{
+			recv(Dst, reinterpret_cast<char*>(&buffer), sizeof(data_chunck), 0);
+			if (buffer.iteration == 0)
+			{
+				res += buffer.content;
+				break;
+			}
+			res += buffer.content;
+		}
+
+		return res;
+	}
+
+	SOCKET sock_retr(std::string Dst)
+	{
+		char* cmp = (char*)Dst.c_str();
+		int res;
+		for (int i = 0; i < client.size(); i++)
+		{
+			res = strcmp(client[i].username, cmp);
+		
+			if (res == 0)
+				return client[i].fd;
+		}
+
+		std::cout << "[*] Unable to retrieve requested file descriptor" << std::endl;
+		return NULL;
+	}
+
+	void exit()
 	{
 		thread_running = false;
 		if (client.size() != 0)
@@ -55,7 +126,6 @@ public:
 		}
 		
 		CloseHandle(T);
-
 		DeleteCriticalSection(&mtx);
 		WSACleanup();
 	}
@@ -68,7 +138,7 @@ private:
 
 DWORD WINAPI net_subroutine(LPVOID clients)
 {
-	std::cout << "[+]Thread entry\n";
+	std::cout << "\n[+]Thread entry\n";
 	SOCKET socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (socket_fd == SOCKET_ERROR)
 		throw std::runtime_error("unable to initialize socket\n");
@@ -84,10 +154,6 @@ DWORD WINAPI net_subroutine(LPVOID clients)
 	listen(socket_fd, BACKLOG);
 	SOCKET buf;
 
-	unsigned long optval = 1;
-	if (ioctlsocket(socket_fd, FIONBIO, &optval) != 0)
-		throw std::runtime_error("ioctl initialization error\m");
-
 	std::vector<struct user>* client_ptr = static_cast<std::vector<struct user>*>(clients);
 
 	while (thread_running)
@@ -95,20 +161,13 @@ DWORD WINAPI net_subroutine(LPVOID clients)
 		buf = accept(socket_fd, (struct sockaddr*)&addr, &addrlen);
 		if (buf != INVALID_SOCKET)
 		{
-			struct user tmp = {buf, NULL};
-			recv(buf, tmp.username, 255, 0);
-
-			EnterCriticalSection(&mtx);
-			client_ptr->push_back(tmp);
-			LeaveCriticalSection(&mtx);
-		} 
-		else
-		{
-			if (WSAGetLastError() != WSAEWOULDBLOCK)
-				throw std::exception("unable to accept connection");
+			struct user res = { buf, NULL };
+			int bytes_read = recv(buf, res.username, 255, 0);
 			
-			if (!thread_running)
-				break;
+			EnterCriticalSection(&mtx);
+			client_ptr->push_back(res);
+			LeaveCriticalSection(&mtx);
 		}
 	}
+	return 0;
 }
