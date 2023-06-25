@@ -46,7 +46,7 @@ void request(std::string cmd, networking *server)
 			}
 		}
 		else
-			std::cout << "[*] No connected clients" <<  std::endl;
+			std::cout << "[*] No connected clients" << std::endl;
 	}
 	else if (cmd.rfind("$disconnect", 0) == 0)
 	{
@@ -108,10 +108,12 @@ void request(std::string cmd, networking *server)
 		{
 			server->recv_text(socket_fd, buf);
 			std::cout << "Client response: " << buf << std::endl;
-		} 
+		}
 		else
 			std::cout << "[*] Unable to reach client" << std::endl;
 	}
+	else if (cmd == "$menu")
+		menu();
 	else
 		std::cout << "[*] Unrecognized command: " << cmd << std::endl;
 }
