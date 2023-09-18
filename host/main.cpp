@@ -1,9 +1,57 @@
+#include <iostream>
 #include "networking.h"
+#include "webserver.h"
 #include "common.h"
+#include "cache.h"
+#include "json.h"
 
 void menu();
 void request(std::string cmd, networking *server); //request, recv, return result
 
+int main() {
+	std::string buf = read_f("C:\\Users\\Jacob\\Desktop\\projects\\win32_rookit\\host\\host\\site\\main.json");
+
+	JSON::JSON_Codec json;
+	JSON::JSON_OBJ* buffer = json.parse(buf);
+	json.display(buffer);
+
+	/*
+	//std::cout << hexify(255) << std::endl;
+	
+	//std::cout << read_f("C:\\Users\\Jacob\\Desktop\\projects\\win32_rookit\\host\\host\\site\\index.html");
+	
+	std::cout << "test\n";
+	init_wsa();
+	http::webserver server("C:\\Users\\Jacob\\Desktop\\projects\\win32_rookit\\host\\host\\site", 4444, 512, 8);
+	server.get("/", [](parsed_request& request, packet_response& response) {
+		set_body_content("index.html", response);
+		set_content_type("text/html", response);
+		set_content_status(200, response);
+	});
+
+	server.get("/script.js", [](parsed_request& request, packet_response& response) {
+		set_body_content("script.js", response);
+		set_content_type("text/javascript", response);
+		set_content_status(200, response);
+	});
+
+	server.get("/image.jpeg", [](parsed_request& request, packet_response& response) {
+		set_body_media_content("image.jpeg", response);
+		set_content_type("image/jpeg", response);
+		set_content_status(200, response);
+	});
+
+	//simulate work
+	Sleep(60 * 1000);
+	
+	server.shutdown();
+	exit_wsa();
+	
+	*/
+	return 0;
+}
+
+/*
 int main(int argc, char** argv)
 {
 	std::cout << R"###(
@@ -16,7 +64,7 @@ int main(int argc, char** argv)
                                                                                     )###";
 
 	menu();
-
+	
 	networking server;
 	std::cout << "[*] Awaiting connection(s)\n";
 
@@ -30,7 +78,7 @@ int main(int argc, char** argv)
 	}
 	return 0;
 }
-
+*/
 void request(std::string cmd, networking *server)
 {
 	//can't use a switch-case statement because the == operator is overloaded by the string class
