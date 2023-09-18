@@ -33,9 +33,6 @@ public:
 	//moved the wsa api to the main class to avoid additional boilerplate code
 	networking()
 	{
-		//wsa init
-		if (WSAStartup(MAKEWORD(2, 2), &_wsa) != 0)
-			throw std::runtime_error("WSA initialization error\n");
 		InitializeCriticalSection(&mtx);
 
 		//what fucking tool thought this was a good design choice,
@@ -49,12 +46,12 @@ public:
 			NULL );
 
 		 if (T == NULL)
-			 throw std::runtime_error("Error creating thread");
+			 throw std::runtime_error("Error creating thread\n");
 	}
 
 	int send_text(SOCKET fd, std::string buffer) // default return value = 0
 	{
-		int bytes_recv = send(fd, buffer.c_str(), buffer.size(), 0);
+		size_t bytes_recv = send(fd, buffer.c_str(), buffer.size(), 0);
 		if (bytes_recv == SOCKET_ERROR)
 		{
 			return -1;
@@ -127,7 +124,6 @@ public:
 		
 		CloseHandle(T);
 		DeleteCriticalSection(&mtx);
-		WSACleanup();
 	}
 
 private:
