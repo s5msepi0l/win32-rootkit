@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <stack>
+#include <vector>
 #include <unordered_map>
 
 inline bool is_digit(char src) {
@@ -16,6 +17,18 @@ inline bool m_is_digit(const char *src) {
 
 
 namespace JSON {
+	typedef enum {
+		STRING,
+		NUMBER,
+		OPERATOR,
+		BRACKET
+	}lexical_token;
+	
+	typedef struct {
+		lexical_token type;
+		std::string value;
+	}token;
+	
 	union JSON_VAL;
 
 	typedef union JSON_VAL{
@@ -54,7 +67,20 @@ namespace JSON {
 			order['}'] = '{';
 		}
 		
+		std::vector<token> tokenize(std::string input) {
+			std::vector<token> tokens;
+			for (char &c: input) {
+				std::cout << (int)c << std::endl;
+			}
+
+			return tokens;
+		}
+
 		JSON_OBJ *parse(std::string input) {
+			std::vector<token> tokens = tokenize()
+
+			return nullptr;	
+			/*
 			std::stack<char> brackets;
 			JSON_OBJ *buffer = new JSON_OBJ();
 			JSON_OBJ *front = buffer;
@@ -106,7 +132,7 @@ namespace JSON {
 						if (m_is_digit(input.c_str())) { // is integer 
 							long number = 0;
 							for (int j = i; j < input.size(); j++) {
-
+								;;
 							}
 						}
 
@@ -121,6 +147,11 @@ namespace JSON {
 				std::cout << "ERROR PARSING JSON FILE\n";
 				// parsing error
 				return front;
+		}
+
+		std::string form(JSON_OBJ* src) {
+		*/
+
 		}
 
 		void display(JSON_OBJ* head) {
