@@ -6,6 +6,12 @@
 #include <stack>
 #include <vector>
 #include <unordered_map>
+#include <variant>
+#include <string.h>
+
+inline bool is_letter(char src) {
+	return (src >= 32 && src <= 126) ? true : false;
+}
 
 inline bool is_digit(char src) {
 	return (src >= '0' && src <= '9') ? true : false;
@@ -20,6 +26,7 @@ namespace JSON {
 	typedef enum {
 		STRING,
 		NUMBER,
+		BOOLEAN,
 		OPERATOR,
 		BRACKET
 	}lexical_token;
@@ -28,138 +35,175 @@ namespace JSON {
 		lexical_token type;
 		std::string value;
 	}token;
-	
-	union JSON_VAL;
 
-	typedef union JSON_VAL{
-		std::string str;
-		long u64;
-		int u32;
-		char u8;
-		//std::pair<JSON_VAL, JSON_VAL> obj;
-		JSON_VAL() : str() { }
-		~JSON_VAL() {} // OOP shit like this makes me want to live in a cabin in the woods and become amish
-	}JSON_VAL;
+	void display_token(std::vector<token> &src) {
+		std::string type = "";
 
-	typedef struct JSON_OBJ{
-		JSON_VAL val;
-		JSON_OBJ* next;
+		for (int i = 0; i < src.size(); i++) {
+			switch (src[i].type) {
+			case STRING:
+				type = "STRING";
+				break;
 
-		JSON_OBJ(): val(), next(nullptr) {}
-		~JSON_OBJ() {
-			JSON_OBJ* tmp;
-			while (next->next != nullptr) {
-				tmp = next;
-				next = next->next;
-				delete tmp;
+			case NUMBER:
+				type = "NUMBER";
+				break;
+
+			case BOOLEAN:
+				type = "BOOLEAN";
+				break;
+
+			case OPERATOR:
+				type = "OPERATOR";
+				break;
+
+			case BRACKET:
+				type = "BRACKET";
+				break;
 			}
-
-			delete next;
-		}
-	}JSON_OBJ;
-
-	class JSON_Codec {
-	private:
-		std::unordered_map<char, char> order;
-	public:
-		JSON_Codec() {
-			order[']'] = '[';
-			order['}'] = '{';
-		}
 		
-		std::vector<token> tokenize(std::string input) {
-			std::vector<token> tokens;
-			for (char &c: input) {
-				std::cout << (int)c << std::endl;
-			}
+			std::cout << "token: (" << i << ")" <<
+				"Value: " << '"' <<  src[i].value << '"' <<
+				"\nType: " << type << std::endl;
+		}
+	}
 
-			return tokens;
+	typedef struct {
+		std::vector<std::variant<std::string, std::nullptr_t, bool, int>> value;
+	}json;
+
+	void display_json(json src) {
+		for (int i = 0; i < src.value.size(); i++) {
+			if (std::holds_alternative<std::string>(src.value[i])) {
+				std::cout << "json_value: " << std::get<std::string>(src.value[i]) << std::endl;
+			}
+			else if (std::holds_alternative<bool>(src.value[i])) {
+				if (std::get<bool>(src.value[i]) == true)
+					std::cout << "json_value: true\n";
+				else
+					std::cout << "json_value: false\n";
+			}
+			else if (std::holds_alternative<int>(src.value[i])) {
+				int tmp = std::get<int>(src.value[i]);
+				std::cout << "json_value: " << tmp << std::endl;
+			}
+		}
+	}
+		
+	std::vector<token> tokenize(std::string input) {
+		std::vector<token> tokens;
+		std::stack<char> brackets;
+		token buffer;
+
+		for (int i = 0; i < input.size(); i++) {
+			switch (input[i]) {
+				case ' ':
+					continue;
+
+				case '"':
+					while (input[++i] != '"') {
+						if (is_letter(input[i]))
+							buffer.value.push_back(input[i]);
+					}
+					tokens.push_back(token{ STRING, buffer.value });
+
+					break;
+
+				case ',':
+					tokens.push_back(token{ OPERATOR, "," });
+						break;
+
+				case '[':
+					tokens.push_back(token{ BRACKET, "[" });
+					break;
+
+				case ']':
+					tokens.push_back(token{ BRACKET, "]" });
+					break;
+
+				default: //current value is either boolean or integer
+					if (m_is_digit(input.c_str() + i)) { // is integer 
+						buffer.value.clear();
+						buffer.type = NUMBER;
+						while (m_is_digit(input.c_str() + i)) {
+							buffer.value.push_back(input[i++]);
+						}
+						tokens.push_back(buffer);
+					
+						
+					}
+
+					switch (input[i]) {
+						case 't':
+							if (input.substr(i, 4) == "true") {
+								tokens.push_back(token{ BOOLEAN, "true" });
+							}
+							break;
+
+						case 'f':
+							if (input.substr(i, 5) == "false") {
+								tokens.push_back(token{ BOOLEAN, "false" });
+							}
+							break;
+					}
+			}
 		}
 
-		JSON_OBJ *parse(std::string input) {
-			std::vector<token> tokens = tokenize()
+		return tokens;
+	}
 
-			return nullptr;	
-			/*
-			std::stack<char> brackets;
-			JSON_OBJ *buffer = new JSON_OBJ();
-			JSON_OBJ *front = buffer;
-	
-			for (int i = 0; i < input.size(); i++) {
-				switch (input[i]) {
-					case ' ':
-						continue;
+		json parse(std::string input) {
+			std::vector<token> tokens = tokenize(input);
+			json buffer;
+			display_token(tokens);
 
-					case '"':
-						while (input[++i] != '"') {
-							buffer->val.str.push_back(input[i]);
-						}
+			for (int i = 0; i < tokens.size(); i++) {
+				switch (tokens[i].type) {
+					case STRING:
+						buffer.value.push_back(tokens[i].value);
 						break;
 
-					case ',':
-						buffer->next = new JSON_OBJ();
-						buffer = buffer->next;
+					case BOOLEAN:
+						buffer.value.push_back(tokens[i].value);
 						break;
 
-					case '[':
-						brackets.push('[');
-						break;
-
-					case ']':
-						std::cout << "check" << std::endl;
-						if (brackets.top() != '[')
-							goto error;
-						else
-							brackets.pop();
-						break;
-					
-					case '{':
-						brackets.push('{');
-						break;
-
-					case '}':
-						std::cout << "check" << std::endl;
-						if (brackets.top() != '{')
-							goto error;
-						else
-							brackets.pop();
-						break;
-
-					case ':':
-						break; 
-
-					default: //current value is either boolean or integer
-						if (m_is_digit(input.c_str())) { // is integer 
-							long number = 0;
-							for (int j = i; j < input.size(); j++) {
-								;;
-							}
-						}
+					case NUMBER:
+						buffer.value.push_back(atoi(tokens[i].value.c_str()));
 
 						break;
 				}
+					
 			}
-			if (brackets.size() != 0)
-				goto error;
-
-			return front;
-			error:
-				std::cout << "ERROR PARSING JSON FILE\n";
-				// parsing error
-				return front;
+			
+			return buffer;
 		}
 
-		std::string form(JSON_OBJ* src) {
-		*/
+		std::string stringify(json content) {
+			std::string buffer("[");
+			for (int i = 0; i < content.value.size(); i++) {
+				if (std::holds_alternative<std::string>(content.value[i])) {
+					std::string tmp_content("\"");
+					tmp_content.append(std::get<std::string>(content.value[i]));
+					tmp_content.append("\"");
 
-		}
-
-		void display(JSON_OBJ* head) {
-			JSON_OBJ* next = head;
-			while (next != nullptr) {
-				std::cout << next->val.str << std::endl;
-				next = next->next;
+					buffer.append(tmp_content);
+				}
+				else if (std::holds_alternative<bool>(content.value[i])) {
+					if (std::get<bool>(content.value[i]) == true)
+						buffer.append("true");
+					else
+						buffer.append("false");
+				}
+				else if (std::holds_alternative<int>(content.value[i])) {
+					int tmp_int = std::get<int>(content.value[i]);
+					buffer.append(std::to_string(tmp_int));
+				}
+			
+				if (i > content.value.size())
+					buffer.append(",");
+				else
+					buffer.append("]");
 			}
+			return buffer;
 		}
-	};
 };
