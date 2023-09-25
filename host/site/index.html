@@ -3,14 +3,42 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>index</title>
+        <title> Dashboard </title>
+    
+        <link rel="stylesheet" href="styles.css">
     </head>
 
     <body>
-        <h1> Index</h1>
-        <a href="home.html" target="_blank">Home page</a>
-        <link rel="stylesheet" href="script.js">
+        <div class="client_container">
+            
+            <div class="list_label"> 
+                <h1>IPv4 address</h1>
+                <h1>CPU</h1>
+                <h1>GPU</h1>
+                <h1>Disk</h1>
+                <h1>Ram</h1>
+            </div>
 
-        <img src="image.jpeg" width="300" height="300">
+            
+            <ul class="clients"> 
+               <li> 
+                    <span class="ipv4"> 192.168.1.108 </span>
+                    <span class="cpu"> intel core i9-13900k </span>
+                    <span class="gpu"> GeForce RTX 3090 </span>
+                    <span class="Disk"> WD Red Plus NAS 8TB</span>
+                    <span class="Ram"> 35.3 GB </span>
+               </li>
+
+               <li> 
+                <button class="disconnect">Disconnect</button>
+                <span class="ipv4"> 192.168.1.223 </span>
+                <span class="cpu"> intel core i9-13900k </span>
+                <span class="gpu"> GeForce RTX 3090 </span>
+                <span class="Disk"> WD Red Plus NAS 8TB</span>
+                <span class="Ram"> 35 GB </span>
+           </li>
+            </ul>
+        </div>
+        <script src="script.js"></script>
     </body>
 </html>
