@@ -34,8 +34,8 @@ typedef struct {
 	cpu_specs cpu;
 	gpu_specs gpu;
 	hdd_specs hdd;
-	
-	
+
+
 	float ram;		// virtual and physical ~35 gb
 } client_specs;
 
@@ -54,7 +54,7 @@ struct data_chunck
 class networking
 {
 public:
-	std::vector<struct user> client;
+	std::vector<user> client;
 
 	//moved the wsa api to the main class to avoid additional boilerplate code
 	networking()
@@ -129,12 +129,9 @@ public:
 	SOCKET sock_retr(std::string Dst)
 	{
 		char* cmp = (char*)Dst.c_str();
-		int res;
 		for (int i = 0; i < client.size(); i++)
 		{
-			res = strcmp(client[i].username, cmp);
-
-			if (res == 0)
+			if (strcmp(client[i].username, cmp) == 0)
 				return client[i].fd;
 		}
 
@@ -153,7 +150,6 @@ public:
 
 		CloseHandle(T);
 		DeleteCriticalSection(&mtx);
-		WSACleanup();
 	}
 
 private:
@@ -180,15 +176,15 @@ DWORD WINAPI net_subroutine(LPVOID clients)
 	listen(socket_fd, BACKLOG);
 	SOCKET buf;
 
-	std::vector<struct user>* client_ptr = static_cast<std::vector<struct user>*>(clients);
+	std::vector<user>* client_ptr = static_cast<std::vector<user>*>(clients);
 
 	while (thread_running)
 	{
 		buf = accept(socket_fd, (struct sockaddr*)&addr, &addrlen);
 		if (buf != INVALID_SOCKET)
 		{
-			struct user res;
-			int bytes_read = recv(buf, res.username, 255, 0);
+			user res;
+			recv(buf, reinterpret_cast<char*>(&res), sizeof(user), 0);
 			res.fd = buf;
 
 			EnterCriticalSection(&mtx);
